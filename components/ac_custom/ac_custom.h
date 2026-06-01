@@ -233,7 +233,7 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
             rx_buf_[i+2]  == 0x0D &&
             rx_buf_[i+17] == 0xF5) {
           uint8_t chk = 0;
-          for (int j = i + 1; j < i + 17; j++) chk += rx_buf_[j];
+          for (int j = i + 1; j < i + 16; j++) chk += rx_buf_[j];
           if (chk == rx_buf_[i + 16]) {
             process_status_(rx_buf_ + i + 3);
             found = i + 18;
