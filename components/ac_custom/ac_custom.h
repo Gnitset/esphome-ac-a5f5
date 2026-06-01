@@ -69,6 +69,7 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
 
   climate::ClimateTraits traits() override {
     auto t = climate::ClimateTraits();
+    t.add_feature_flag(climate::CLIMATE_FEATURE_CURRENT_TEMPERATURE);
     t.set_supported_modes({
         climate::CLIMATE_MODE_OFF,
         climate::CLIMATE_MODE_COOL,
