@@ -281,9 +281,11 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
              "Status: pwr=%d mode=%d sleep=%d sensor=%.1f sp=%.1f swing=%d fan=%d cf=%s",
              power, mode, slp, sensor, setpoint, swng, fan, cel ? "C" : "F");
 
-    // Log when any reserved byte is non-zero — indicates an undecoded fault or flag.
-    // The text sensor in HA also shows these; this makes them visible in device logs.
-    bool any_unknown = (d[7] || d[8] || d[9] || d[10] || (d[11] & ~0x04u) || d[12]);
+    // Warn when any byte deviates from its known baseline — indicates an undecoded
+    // fault or flag. d[11] normally sits at 0x48 (°C) or 0x4C (°F); other values
+    // are unexpected. The text sensor in HA shows these for live inspection.
+    bool any_unknown = (d[7] || d[8] || d[9] || d[10] ||
+                        ((d[11] & ~0x04u) != 0x48) || d[12]);
     if (any_unknown) {
       ESP_LOGW(TAG,
                "Unknown status bytes: [7]=%02X [8]=%02X [9]=%02X [10]=%02X [11]=%02X [12]=%02X",
