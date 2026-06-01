@@ -75,14 +75,12 @@ switch:
     lambda: return id(ac_climate).get_swing();
     turn_on_action:  { lambda: id(ac_climate).set_swing(true); }
     turn_off_action: { lambda: id(ac_climate).set_swing(false); }
-    optimistic: false
 
   - platform: template
     name: "AC Unit Sleep"
     lambda: return id(ac_climate).get_sleep();
     turn_on_action:  { lambda: id(ac_climate).set_sleep(true); }
     turn_off_action: { lambda: id(ac_climate).set_sleep(false); }
-    optimistic: false
 
 binary_sensor:
   - platform: template
