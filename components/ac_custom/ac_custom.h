@@ -54,6 +54,7 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
   void setup() override {
     setup_time_     = millis();
     last_heartbeat_ = millis();
+    ESP_LOGI(TAG, "ac_custom starting — waiting for first AC status packet");
   }
 
   void loop() override {
@@ -201,12 +202,28 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
   // ── RX: accumulate bytes, scan for complete packets ───────────────────────
 
   void read_uart_() {
+    bool got_bytes = false;
     while (available()) {
+      uint8_t b = (uint8_t) read();
       if (rx_len_ < sizeof(rx_buf_))
-        rx_buf_[rx_len_++] = (uint8_t) read();
-      else
-        rx_len_ = 0;  // overflow — re-sync
+        rx_buf_[rx_len_++] = b;
+      else {
+        ESP_LOGW(TAG, "RX buffer overflow — re-syncing");
+        rx_len_ = 0;
+      }
+      got_bytes = true;
     }
+
+    if (got_bytes) {
+      // Log raw bytes at VERBOSE so they're visible when diagnosing wiring issues.
+      // Build a hex string of the current buffer contents.
+      char hex[rx_len_ * 3 + 1];
+      for (uint8_t i = 0; i < rx_len_; i++)
+        sprintf(hex + i * 3, "%02X ", rx_buf_[i]);
+      if (rx_len_) hex[rx_len_ * 3 - 1] = '\0';
+      ESP_LOGV(TAG, "RX raw (%u bytes): %s", rx_len_, hex);
+    }
+
     // Try to extract packets from the buffer
     while (rx_len_ >= 18) {
       int found = -1;
@@ -221,11 +238,13 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
             process_status_(rx_buf_ + i + 3);
             found = i + 18;
             break;
+          } else {
+            ESP_LOGW(TAG, "A5/F5 header found at [%d] but checksum bad (got %02X, expected %02X)",
+                     i, rx_buf_[i + 16], chk);
           }
         }
       }
       if (found < 0) {
-        // No valid header found — drop one byte and try again
         memmove(rx_buf_, rx_buf_ + 1, rx_len_ - 1);
         rx_len_--;
         return;
