@@ -203,26 +203,13 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
   // ── RX: accumulate bytes, scan for complete packets ───────────────────────
 
   void read_uart_() {
-    bool got_bytes = false;
     while (available()) {
-      uint8_t b = (uint8_t) read();
       if (rx_len_ < sizeof(rx_buf_))
-        rx_buf_[rx_len_++] = b;
+        rx_buf_[rx_len_++] = (uint8_t) read();
       else {
         ESP_LOGW(TAG, "RX buffer overflow — re-syncing");
         rx_len_ = 0;
       }
-      got_bytes = true;
-    }
-
-    if (got_bytes) {
-      // Log raw bytes at VERBOSE so they're visible when diagnosing wiring issues.
-      // Build a hex string of the current buffer contents.
-      char hex[rx_len_ * 3 + 1];
-      for (uint8_t i = 0; i < rx_len_; i++)
-        sprintf(hex + i * 3, "%02X ", rx_buf_[i]);
-      if (rx_len_) hex[rx_len_ * 3 - 1] = '\0';
-      ESP_LOGV(TAG, "RX raw (%u bytes): %s", rx_len_, hex);
     }
 
     // Try to extract packets from the buffer
@@ -270,21 +257,18 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
     memcpy(raw_d_, d, 13);
 
     bool    power    = (d[0] != 0x00);
-    uint8_t mode     = d[1];
+    uint8_t mode_raw = d[1];
     bool    slp      = (d[2] != 0x00);
     float   sensor   = decode_temp_(d[3]);
     float   setpoint = decode_temp_(d[4]);
     bool    swng     = (d[5] != 0x00);
-    uint8_t fan      = d[6];
+    uint8_t fan_raw  = d[6];
     bool    cel      = !(d[11] & 0x04);  // bit2=0 → °C, bit2=1 → °F
 
     ESP_LOGD(TAG,
              "Status: pwr=%d mode=%d sleep=%d sensor=%.1f sp=%.1f swing=%d fan=%d cf=%s",
-             power, mode, slp, sensor, setpoint, swng, fan, cel ? "C" : "F");
+             power, mode_raw, slp, sensor, setpoint, swng, fan_raw, cel ? "C" : "F");
 
-    // Warn when any byte deviates from its known baseline — indicates an undecoded
-    // fault or flag. d[11] normally sits at 0x48 (°C) or 0x4C (°F); other values
-    // are unexpected. The text sensor in HA shows these for live inspection.
     bool any_unknown = (d[7] || d[8] || d[9] || d[10] ||
                         ((d[11] & ~0x04u) != 0x48) || d[12]);
     if (any_unknown) {
@@ -293,34 +277,46 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
                d[7], d[8], d[9], d[10], d[11], d[12]);
     }
 
-    // Update stored states for lambda access
+    // Compute new climate mode
+    climate::ClimateMode new_mode;
+    if (!power) {
+      new_mode = climate::CLIMATE_MODE_OFF;
+    } else {
+      switch (mode_raw) {
+        case 0x01: new_mode = climate::CLIMATE_MODE_COOL;     break;
+        case 0x02: new_mode = climate::CLIMATE_MODE_DRY;      break;
+        case 0x03: new_mode = climate::CLIMATE_MODE_FAN_ONLY; break;
+        default:   new_mode = climate::CLIMATE_MODE_COOL;     break;
+      }
+    }
+
+    climate::ClimateFanMode new_fan;
+    switch (fan_raw) {
+      case 0x02: new_fan = climate::CLIMATE_FAN_MEDIUM; break;
+      case 0x03: new_fan = climate::CLIMATE_FAN_HIGH;   break;
+      default:   new_fan = climate::CLIMATE_FAN_LOW;    break;
+    }
+
+    // Only publish when something actually changed to keep HA log clean
+    bool changed = (this->mode != new_mode ||
+                    this->fan_mode != new_fan ||
+                    fabsf(current_temperature - sensor) > 0.05f ||
+                    fabsf(target_temperature  - setpoint) > 0.05f ||
+                    swing_        != swng ||
+                    sleep_        != slp  ||
+                    celsius_mode_ != cel);
+
     swing_        = swng;
     sleep_        = slp;
     celsius_mode_ = cel;
 
-    // Update climate entity
     current_temperature = sensor;
     target_temperature  = setpoint;
+    this->mode  = new_mode;
+    this->fan_mode = new_fan;
 
-    if (!power) {
-      this->mode = climate::CLIMATE_MODE_OFF;
-    } else {
-      switch (mode) {
-        case 0x01: this->mode = climate::CLIMATE_MODE_COOL;     break;
-        case 0x02: this->mode = climate::CLIMATE_MODE_DRY;      break;
-        case 0x03: this->mode = climate::CLIMATE_MODE_FAN_ONLY; break;
-        default:   this->mode = climate::CLIMATE_MODE_COOL;     break;
-      }
-    }
-
-    switch (fan) {
-      case 0x01: fan_mode = climate::CLIMATE_FAN_LOW;    break;
-      case 0x02: fan_mode = climate::CLIMATE_FAN_MEDIUM; break;
-      case 0x03: fan_mode = climate::CLIMATE_FAN_HIGH;   break;
-      default:   fan_mode = climate::CLIMATE_FAN_LOW;    break;
-    }
-
-    publish_state();
+    if (changed)
+      publish_state();
   }
 
   // ── Members ───────────────────────────────────────────────────────────────
