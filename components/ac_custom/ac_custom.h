@@ -203,6 +203,7 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
   // ── RX: accumulate bytes, scan for complete packets ───────────────────────
 
   void read_uart_() {
+    bool got_bytes = false;
     while (available()) {
       if (rx_len_ < sizeof(rx_buf_))
         rx_buf_[rx_len_++] = (uint8_t) read();
@@ -210,6 +211,15 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
         ESP_LOGW(TAG, "RX buffer overflow — re-syncing");
         rx_len_ = 0;
       }
+      got_bytes = true;
+    }
+
+    if (got_bytes) {
+      char hex[sizeof(rx_buf_) * 3 + 1];  // fixed size matching rx_buf_
+      for (uint8_t i = 0; i < rx_len_; i++)
+        sprintf(hex + i * 3, "%02X ", rx_buf_[i]);
+      if (rx_len_) hex[rx_len_ * 3 - 1] = '\0';
+      ESP_LOGV(TAG, "RX raw (%u bytes): %s", rx_len_, hex);
     }
 
     // Try to extract packets from the buffer
