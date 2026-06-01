@@ -84,13 +84,6 @@ switch:
     turn_off_action: { lambda: id(ac_climate).set_sleep(false); }
     optimistic: false
 
-  - platform: template
-    name: "AC Unit Celsius Mode"
-    lambda: return id(ac_climate).get_celsius_mode();
-    turn_on_action:  { lambda: id(ac_climate).set_celsius_mode(true); }
-    turn_off_action: { lambda: id(ac_climate).set_celsius_mode(false); }
-    optimistic: false
-
 binary_sensor:
   - platform: template
     name: "AC Unit Water Tank Full"
@@ -119,7 +112,6 @@ text_sensor:
 | AC Unit | Climate | Power, mode (Cool/Dry/Fan), setpoint 16–31 °C, current temp, fan Low/Med/High |
 | Swing | Switch | Louver oscillation |
 | Sleep | Switch | Sleep mode — forces fan to Low |
-| Celsius Mode | Switch | ON = °C display, OFF = °F display (AC may ignore, see protocol notes) |
 | Water Tank Full | Binary sensor | Always `false` until fault bit is identified — see below |
 | Fault | Binary sensor | Always `false` until fault bit is identified — see below |
 | Status Bytes (debug) | Text sensor | Raw hex of status bytes d[7]–d[12]; diagnostic category |
