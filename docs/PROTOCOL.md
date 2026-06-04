@@ -336,4 +336,4 @@ these bytes for future fault capture.
 | Timer | d[7–12]? | none | never seen | cloud-only, no UART |
 | C/F display | d[11] bit2 | 0x19 | ✓ confirmed | captured; AC may ignore |
 | Water tank full | d[12]==0x03 | — read-only | ✓ confirmed | 0x03 observed when full LED lit |
-| Fault | d[12]!=0x00 && !=0x03 | — read-only | assumed | any other non-zero d[12] |
+| Fault | d[12]!=0x00 | — read-only | assumed | any non-zero d[12], including tank full |

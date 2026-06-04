@@ -140,9 +140,8 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
     return raw_d_[12] == 0x03;
   }
 
-  // General fault: any non-zero d[12] value other than the known water-tank code.
   bool get_fault() const {
-    return raw_d_[12] != 0x00 && raw_d_[12] != 0x03;
+    return raw_d_[12] != 0x00;
   }
 
   // Raw hex of d[7]–d[12] for live inspection in HA.
