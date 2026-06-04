@@ -103,7 +103,7 @@ len    = 0x0D  (13 bytes)
 | d[9] | Reserved | always `0x00` | |
 | d[10] | Reserved | always `0x00` | |
 | d[11] | Flags | bit2: `0`=°C, `1`=°F; other bits always `0x48` | See notes |
-| d[12] | Reserved | always `0x00` | |
+| d[12] | Water/fault | `0x00`=OK, `0x03`=tank full; other non-zero=fault | Unit beeps and stops cooling when non-zero |
 
 ### d[11] flags byte
 
@@ -275,21 +275,13 @@ These are enforced by the AC mainboard firmware and cannot be overridden by the 
 
 ## Unknown / unconfirmed bytes
 
-The following bytes in the status packet always read `0x00` in normal operation.
-One or more of them likely encodes fault states (water-tank-full, general fault),
-but this has not been captured yet.
+Bytes d[7]–d[10] always read `0x00` in all captures. Their purpose is unknown.
 
-| Byte | Suspected purpose | How to confirm |
-|------|------------------|----------------|
-| d[7] | Water tank full? General fault? | Fill water tank; observe change |
-| d[8] | Unknown | — |
-| d[9] | Unknown | — |
-| d[10] | Unknown | — |
-| d[12] | Unknown | — |
-| d[11] non-bit2 bits | Unknown (always `0x48` base) | — |
+**d[12]** is confirmed: `0x00` = normal, `0x03` = water tank full (unit beeps and stops
+cooling). Any other non-zero value is treated as a general fault.
 
 The `get_status_hex()` method and `Status Bytes` text sensor in HA expose all of
-these bytes in real time for exactly this purpose.
+these bytes for future fault capture.
 
 ---
 
@@ -343,5 +335,5 @@ these bytes in real time for exactly this purpose.
 | Fan | d[6] | 0x16 | ✓ confirmed | ✓ 0x01/0x02/0x03 |
 | Timer | d[7–12]? | none | never seen | cloud-only, no UART |
 | C/F display | d[11] bit2 | 0x19 | ✓ confirmed | captured; AC may ignore |
-| Water tank full | d[7–12]? | — read-only | not yet captured | — |
-| Fault | d[7–12]? | — read-only | not yet captured | — |
+| Water tank full | d[12]==0x03 | — read-only | ✓ confirmed | 0x03 observed when full LED lit |
+| Fault | d[12]!=0x00 && !=0x03 | — read-only | assumed | any other non-zero d[12] |

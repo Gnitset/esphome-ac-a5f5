@@ -110,8 +110,8 @@ text_sensor:
 | AC Unit | Climate | Power, mode (Cool/Dry/Fan), setpoint 16–31 °C, current temp, fan Low/Med/High |
 | Swing | Switch | Louver oscillation |
 | Sleep | Switch | Sleep mode — forces fan to Low |
-| Water Tank Full | Binary sensor | Always `false` until fault bit is identified — see below |
-| Fault | Binary sensor | Always `false` until fault bit is identified — see below |
+| Water Tank Full | Binary sensor | `true` when d[12] ≠ 0x00 (unit beeps and stops cooling) |
+| Fault | Binary sensor | Always `false` until fault bit is identified |
 | Status Bytes (debug) | Text sensor | Raw hex of status bytes d[7]–d[12]; diagnostic category |
 
 ### Known AC behavioral constraints
@@ -124,26 +124,20 @@ These are enforced by the AC mainboard firmware, not by this component:
 
 ---
 
-## Identifying the Water Tank and Fault bits
+## Identifying the Fault bit
 
-The water-tank-full LED and general fault LED are reported somewhere in status bytes
-`d[7]`–`d[12]`, but the exact bits have not yet been captured during a fault condition.
+The general fault LED (`get_fault()`) is not yet decoded. Normal status bytes are:
 
-**How to find them:**
-
-1. Flash this firmware and add the `Status Bytes` text sensor to your HA dashboard.
-2. Note the normal value: `[7]=00 [8]=00 [9]=00 [10]=00 [11]=48 [12]=00`
-3. Trigger the condition (fill the water tank / wait for fault LED to light).
-4. The `Status Bytes` sensor will change — note which byte is now non-zero.
-   The ESPHome device log will also print a `WARN` line with the same hex dump.
-5. Identify which bit changed (e.g. `[7]=02` → d[7] bit 1).
-6. Edit `ac_custom.h` and update the stub:
-
-```cpp
-bool get_water_full() const { return raw_d_[7] & 0x02; }  // example
+```
+[7]=00 [8]=00 [9]=00 [10]=00 [11]=48 [12]=00
 ```
 
-7. Open a PR or issue with your findings so the component can be updated.
+If you trigger a fault condition, watch the `Status Bytes` diagnostic text sensor in HA
+and note which byte changes. The ESPHome device log will also print a `WARN` line.
+Open a PR or issue with your findings so the component can be updated.
+
+**Water tank full** is decoded: `d[12] != 0x00` (observed `0x03` when the full LED lit
+and the unit stopped cooling).
 
 ---
 

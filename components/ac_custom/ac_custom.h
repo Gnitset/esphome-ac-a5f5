@@ -23,7 +23,7 @@
  *     d[6]  fan       0x01=Low  0x02=Medium  0x03=High
  *     d[7-10]         reserved (always 0x00)
  *     d[11] flags     bit2=0→°C display  bit2=1→°F display
- *     d[12]           reserved (always 0x00)
+ *     d[12] water/fault  0x00=OK  0x03=tank full  other≠0=fault
  *
  *   MCU→AC commands (each sets one field):
  *     0x11  power     0x00=OFF  0xFF=ON  (NOTE: ON is 0xFF, not 0x01)
@@ -137,12 +137,12 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
 
   // Water-tank-full LED: unit stops cooling until tank is emptied.
   bool get_water_full() const {
-    return false;  // TODO: fill tank, note changed byte in status_hex(), set correct bit
+    return raw_d_[12] == 0x03;
   }
 
-  // General fault (Fail LED on unit).
+  // General fault: any non-zero d[12] value other than the known water-tank code.
   bool get_fault() const {
-    return false;  // TODO: trigger fault, note changed byte in status_hex(), set correct bit
+    return raw_d_[12] != 0x00 && raw_d_[12] != 0x03;
   }
 
   // Raw hex of d[7]–d[12] for live inspection in HA.
@@ -280,7 +280,7 @@ class AcCustom : public Component, public uart::UARTDevice, public climate::Clim
              power, mode_raw, slp, sensor, setpoint, swng, fan_raw, cel ? "C" : "F");
 
     bool any_unknown = (d[7] || d[8] || d[9] || d[10] ||
-                        ((d[11] & ~0x04u) != 0x48) || d[12]);
+                        ((d[11] & ~0x04u) != 0x48));
     if (any_unknown) {
       ESP_LOGW(TAG,
                "Unknown status bytes: [7]=%02X [8]=%02X [9]=%02X [10]=%02X [11]=%02X [12]=%02X",
